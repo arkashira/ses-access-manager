@@ -1,49 +1,38 @@
-from ses_access_manager import SESAccessManager, ComplianceArtifact
-import pytest
+from datetime import datetime, timedelta
+from ses_access_manager import SESAccessManager, Customer
 
-def test_register_aws_account():
+def test_record_access_granted():
     manager = SESAccessManager()
-    aws_account_id = "123456789012"
-    region = "us-west-2"
-    contact_email = "example@example.com"
-    workflow_id = manager.register_aws_account(aws_account_id, region, contact_email)
-    assert workflow_id is not None
+    customer = Customer(1, datetime.now())
+    manager.customers.append(customer)
+    manager.record_access_granted(1)
+    assert customer.access_granted_date is not None
 
-def test_register_aws_account_missing_fields():
+def test_get_metrics():
     manager = SESAccessManager()
-    aws_account_id = "123456789012"
-    region = ""
-    contact_email = "example@example.com"
-    with pytest.raises(ValueError):
-        manager.register_aws_account(aws_account_id, region, contact_email)
+    customer1 = Customer(1, datetime.now())
+    customer2 = Customer(2, datetime.now() - timedelta(days=31))
+    customer2.access_granted_date = datetime.now()
+    manager.customers = [customer1, customer2]
+    metrics = manager.get_metrics()
+    assert metrics['total_sign_ups'] == 2
+    assert metrics['granted_access'] == 1
+    assert metrics['within_30_days'] == 0
 
-def test_upload_compliance_artifacts():
+def test_export_to_analytics_db():
     manager = SESAccessManager()
-    artifacts = [ComplianceArtifact("artifact1.pdf", "content1"), ComplianceArtifact("artifact2.pdf", "content2")]
-    manager.upload_compliance_artifacts(artifacts)
+    customer = Customer(1, datetime.now())
+    manager.customers.append(customer)
+    manager.export_to_analytics_db()
+    assert len(manager.analytics_db) == 1
 
-def test_upload_compliance_artifacts_too_many():
+def test_update_admin_dashboard():
     manager = SESAccessManager()
-    artifacts = [ComplianceArtifact("artifact1.pdf", "content1") for _ in range(6)]
-    with pytest.raises(ValueError):
-        manager.upload_compliance_artifacts(artifacts)
-
-def test_send_email_receipt():
-    manager = SESAccessManager()
-    contact_email = "example@example.com"
-    workflow_id = "1234567890"
-    manager.send_email_receipt(contact_email, workflow_id)
-
-def test_validate_registration_form():
-    manager = SESAccessManager()
-    aws_account_id = "123456789012"
-    region = "us-west-2"
-    contact_email = "example@example.com"
-    assert manager.validate_registration_form(aws_account_id, region, contact_email) is True
-
-def test_validate_registration_form_missing_fields():
-    manager = SESAccessManager()
-    aws_account_id = "123456789012"
-    region = ""
-    contact_email = "example@example.com"
-    assert manager.validate_registration_form(aws_account_id, region, contact_email) is False
+    customer1 = Customer(1, datetime.now())
+    customer2 = Customer(2, datetime.now() - timedelta(days=31))
+    customer2.access_granted_date = datetime.now()
+    manager.customers = [customer1, customer2]
+    dashboard = manager.update_admin_dashboard()
+    assert dashboard['total_sign_ups'] == 2
+    assert dashboard['granted_access'] == 1
+    assert dashboard['within_30_days'] == 0

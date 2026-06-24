@@ -1,46 +1,45 @@
 import json
 from dataclasses import dataclass
-from email.message import EmailMessage
+from datetime import datetime, timedelta
 from typing import List
-import uuid
-import smtplib
-from email.utils import parseaddr
 
 @dataclass
-class ComplianceArtifact:
-    filename: str
-    content: str
+class Customer:
+    id: int
+    sign_up_date: datetime
+    access_granted_date: datetime = None
 
 class SESAccessManager:
     def __init__(self):
-        self.workflow_id = None
+        self.customers = []
+        self.analytics_db = []
 
-    def register_aws_account(self, aws_account_id: str, region: str, contact_email: str) -> str:
-        if not aws_account_id or not region or not contact_email:
-            raise ValueError("Required fields are missing")
-        self.workflow_id = str(uuid.uuid4())
-        return self.workflow_id
+    def record_access_granted(self, customer_id: int):
+        for customer in self.customers:
+            if customer.id == customer_id:
+                customer.access_granted_date = datetime.now()
+                break
 
-    def upload_compliance_artifacts(self, artifacts: List[ComplianceArtifact]) -> None:
-        if len(artifacts) > 5:
-            raise ValueError("Too many compliance artifacts")
-        for artifact in artifacts:
-            if not artifact.filename or not artifact.content:
-                raise ValueError("Invalid compliance artifact")
+    def get_metrics(self):
+        total_sign_ups = len(self.customers)
+        granted_access = sum(1 for customer in self.customers if customer.access_granted_date)
+        within_30_days = sum(1 for customer in self.customers if customer.access_granted_date and (customer.access_granted_date - customer.sign_up_date).days <= 30)
+        return {
+            'total_sign_ups': total_sign_ups,
+            'granted_access': granted_access,
+            'within_30_days': within_30_days / total_sign_ups if total_sign_ups > 0 else 0
+        }
 
-    def send_email_receipt(self, contact_email: str, workflow_id: str) -> None:
-        msg = EmailMessage()
-        msg.set_content(f"Your workflow ID is: {workflow_id}")
-        msg["Subject"] = "SES Access Workflow Receipt"
-        msg["From"] = "ses-access-manager@example.com"
-        msg["To"] = contact_email
-        try:
-            with smtplib.SMTP("localhost") as smtp:
-                smtp.send_message(msg)
-        except OSError as e:
-            print(f"Error sending email: {e}")
+    def export_to_analytics_db(self):
+        self.analytics_db.append({
+            'timestamp': datetime.now(),
+            'metrics': self.get_metrics()
+        })
 
-    def validate_registration_form(self, aws_account_id: str, region: str, contact_email: str) -> bool:
-        if not aws_account_id or not region or not contact_email:
-            return False
-        return True
+    def update_admin_dashboard(self):
+        metrics = self.get_metrics()
+        return {
+            'total_sign_ups': metrics['total_sign_ups'],
+            'granted_access': metrics['granted_access'],
+            'within_30_days': metrics['within_30_days']
+        }

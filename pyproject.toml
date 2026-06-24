@@ -3,7 +3,7 @@ requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"
 
 [tool.poetry]
-name = "aws-ticket-manager"
+name = "ses-access-manager"
 version = "1.0.0"
 description = ""
 
